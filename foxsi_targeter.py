@@ -29,6 +29,9 @@ import csv
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+# Set alphabet list
+azlist = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P']
+colors = ['red', 'green', 'blue', 'orange', 'purple','cyan','white','grey','black']
 ###############################################################################
 ###############################################################################
 # Class for Main GUI
@@ -195,7 +198,7 @@ class FOXSITargetGUI(QWidget):
             if len(parts) < 2:
                 QMessageBox.warning(self, "Error", "Invalid data format.")
                 return
-            row_names.append(" "+str(ri+1)+". "+parts[0]+"         ")
+            row_names.append(" "+str(azlist[ri])+". "+parts[0].split('.')[-1]+"         ")
             values = parts[1].replace(' (', ' ').replace(')', '').replace(',', ' ').split()
             fvals  = []
             # Assign HPC Values
@@ -282,6 +285,36 @@ class FOXSITargetGUI(QWidget):
         self.new_window.showMaximized()
     ###########################################################################
     def show_hmi(self):
+        #----------------------------------------------------------------------
+        # Get the input data
+        data = self.data_text.toPlainText().strip()
+        # Split the data into rows
+        rows = data.split('\n')
+        #----------------------------------------------------------------------
+        # Get AR data
+        rows_data = rows[2:]
+        # Get AR Observation Date
+        obsdate = (rows[0].split(' '))[-1]
+        # Get the selected launch date
+        launchdate = self.date_time_edit.dateTime().toString("yyyy/MM/ddTHH:mm:ss")
+        # Initialize Table contents
+        coor_data   = np.zeros((2,len(rows_data)))
+        row_names    = []
+        #----------------------------------------------------------------------
+        # Iterate each AR
+        for ri,row in enumerate(rows_data):
+            parts = row.split(': ')
+            if len(parts) >= 2:
+                row_names.append(" "+str(azlist[ri])+". "+parts[0].split('.')[-1]+"         ")
+                values = parts[1].replace(' (', ' ').replace(')', '').replace(',', ' ').split()
+                # Assign HPC Values
+                Tx = float(values[-2].replace('"', ''))
+                Ty = float(values[-1].replace('"', ''))
+                newTx,newTy,launchlon,launchlat = self.transform_target_to_foxsi_hpc(Tx,Ty,obsdate,launchdate)
+                coor_data[0,ri] = launchlon[2].value
+                coor_data[1,ri] = launchlat[2].value
+        
+        #----------------------------------------------------------------------
         # Open a file explorer dialog to select a file
         default_dir = os.path.join(os.getcwd(), "HMI")
         img_dir = os.path.join(default_dir, "Images")
@@ -309,8 +342,19 @@ class FOXSITargetGUI(QWidget):
             data[np.where(np.isnan(data))] = 0
             datasz = np.shape(data)
             fig = plt.figure(figsize=(20,20))
+            # Set the background color of the plot
             ax = fig.add_subplot(projection=hmi_rotated)
+            ax.set_facecolor('black')
             ax.imshow(data, cmap='hot',extent=[0,datasz[0],0,datasz[1]])
+            # Set Targets on Image
+            coor = np.zeros((2,len(rows_data)))
+            if row_names is not None:
+                # Get scale
+                scl = hmi_rotated.scale[0].value
+                # Transform to SAAS Frame
+                coor[0,:] = -1*coor_data[1,:]/scl + datasz[1]/2
+                coor[1,:] =  coor_data[0,:]/scl + datasz[0]/2
+            
             # Create a custom ticker formatter
             if 0:
                 scl = hmi_rotated.scale[0].value
@@ -327,6 +371,18 @@ class FOXSITargetGUI(QWidget):
             ax.annotate(arrow_text, xy=(0.35, -.03), xytext=(0.45, -.04), fontsize=32,
             xycoords='axes fraction', textcoords='axes fraction',
             arrowprops=dict(facecolor='black', arrowstyle='->', linewidth=4))
+            ax.set_xlim([-datasz[0]/3,datasz[0]+datasz[0]/3])
+            ax.set_ylim([-datasz[1]/3,datasz[0]+datasz[1]/3])
+
+            # Plot each circle with a different color
+            for i in range(len(row_names)):
+                #ax.scatter(2048,2048, marker='o', color='purple',
+                #            facecolors='none', label='Test',linewidths=5, s=600, edgecolors=colors[i])
+                plt.scatter(coor[0,i], coor[1,i], marker='o', 
+                            facecolors='none', label=row_names[i],linewidths=5, s=600, color=colors[i])
+            # Add legend
+            plt.legend(fontsize=24)
+            
             plt.show()
             # Save and Open File
             sfile = os.path.join(img_dir, "HMI_IMAGE_"+hmi_map.date.strftime('%Y-%m-%dT%H%M%S'))
@@ -438,7 +494,7 @@ class SPARCSGUI(QWidget):
             if len(parts) < 2:
                 QMessageBox.warning(self, "Error", "Invalid data format.")
                 return
-            row_names.append(" "+str(ri+1)+". "+parts[0]+"         ")
+            row_names.append(" "+str(azlist[ri])+". "+parts[0].split('.')[-1]+"         ")
             values = parts[1].replace(' (', ' ').replace(')', '').replace(',', ' ').split()
             fvals  = []
             # Assign HPC Values
