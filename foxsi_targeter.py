@@ -321,7 +321,12 @@ class FOXSITargetGUI(QWidget):
                 ticks_loc = ax.get_yticks().tolist()
                 ax.yaxis.set_major_locator(mticker.FixedLocator(ticks_loc))
                 ax.set_yticklabels([label_format.format(x) for x in ((ax.get_yticks()-datasz[0]/2)*scl)])
-            ax.set_title("SAAS: HMI IMAGE", fontsize=38)
+            ax.set_title("HMI "+hmi_map.date.strftime('%Y-%m-%dT%H:%M:%S')+" - SAAS Frame ", fontsize=38)
+            # Add annotation at the bottom
+            arrow_text = "Solar North"
+            ax.annotate(arrow_text, xy=(0.35, -.03), xytext=(0.45, -.04), fontsize=32,
+            xycoords='axes fraction', textcoords='axes fraction',
+            arrowprops=dict(facecolor='black', arrowstyle='->', linewidth=4))
             plt.show()
             # Save and Open File
             sfile = os.path.join(img_dir, "HMI_IMAGE_"+hmi_map.date.strftime('%Y-%m-%dT%H%M%S'))
