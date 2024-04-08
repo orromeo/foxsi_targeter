@@ -28,6 +28,7 @@ import os
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 ###############################################################################
 ###############################################################################
 # Class for Main GUI
@@ -281,30 +282,52 @@ class FOXSITargetGUI(QWidget):
         self.new_window.showMaximized()
     ###########################################################################
     def show_hmi(self):
-        
         # Open a file explorer dialog to select a file
         default_dir = os.path.join(os.getcwd(), "HMI")
         img_dir = os.path.join(default_dir, "Images")
         data_dir = os.path.join(default_dir, "Data")
-                                   
+        # Check if the directory exists, if not create it
+        if not os.path.exists(img_dir):
+            os.makedirs(img_dir)
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir)
         file_path, _ = QFileDialog.getOpenFileName(self, "Select Picture",data_dir, "Image Files (*.png *.jpg *.jpeg *.bmp *.fits)")
-        print(file_path)
-        
-        
-        
         # Check if a file is selected
         if file_path:
             hmi_map = sunpy.map.Map(file_path)
-            hmi_rotated = hmi_map.rotate(-90*u.degree,order=3)
-            #hmi_rotated = hmi_map.rotate(order=3)
-            fig = plt.figure()
+            hmi_rotated = hmi_map.rotate(angle=-90*u.degree,order=3)
+            # aia_rotated = hmi_map.rotate(angle=-90*u.degree,order=3)
+            # fig = plt.figure()
+            # ax = fig.add_subplot(projection=aia_rotated)
+            # aia_rotated.plot(axes=ax, clip_interval=(1, 99.99)*u.percent)
+            # aia_rotated.draw_limb(axes=ax)
+            # aia_rotated.draw_grid(axes=ax)
+            # plt.show()
+            #hmi_rotated.plot(axes=ax)
+            # Plot Data
+            data = ((hmi_rotated.data))
+            data[np.where(np.isnan(data))] = 0
+            datasz = np.shape(data)
+            fig = plt.figure(figsize=(20,20))
             ax = fig.add_subplot(projection=hmi_rotated)
-            ax.set_title("HMI IMAGE IN SAAS FRAME")
-            hmi_rotated.plot(axes=ax)
+            ax.imshow(data, cmap='hot',extent=[0,datasz[0],0,datasz[1]])
+            # Create a custom ticker formatter
+            if 0:
+                scl = hmi_rotated.scale[0].value
+                label_format = '{:,.0f}'
+                ticks_loc = ax.get_xticks().tolist()
+                ax.xaxis.set_major_locator(mticker.FixedLocator(ticks_loc))
+                ax.set_xticklabels([label_format.format(x) for x in ((ax.get_xticks()-datasz[0]/2)*scl)])
+                ticks_loc = ax.get_yticks().tolist()
+                ax.yaxis.set_major_locator(mticker.FixedLocator(ticks_loc))
+                ax.set_yticklabels([label_format.format(x) for x in ((ax.get_yticks()-datasz[0]/2)*scl)])
+            ax.set_title("SAAS: HMI IMAGE", fontsize=38)
             plt.show()
-            plt.savefig(os.path.join(img_dir, "Test"),bbox_inches='tight',pad_inches=0.01)
+            # Save and Open File
+            sfile = os.path.join(img_dir, "HMI_IMAGE_"+hmi_map.date.strftime('%Y-%m-%dT%H%M%S'))
+            plt.savefig(sfile)
             plt.close()
-            subprocess.Popen(['C:/Users/Orlando/Downloads/foxsi_pointer/HMI/Images/Test.png'], shell=True)
+            subprocess.Popen(sfile+".png", shell=True)
         else:
             # Display the selected picture (placeholder code)
             QMessageBox.warning(self, "Error", "No Image!")
@@ -312,6 +335,9 @@ class FOXSITargetGUI(QWidget):
     def science_exportToCSV(self,launchdate):
         # Create filename
         filedir  = os.path.join(os.getcwd(), "Science-Target_Tables")
+        # Check if the directory exists, if not create it
+        if not os.path.exists(filedir):
+            os.makedirs(filedir)
         filename = os.path.join(filedir, "Science-Target_Tables_"+launchdate+".csv")
         # Access the table model
         model = self.table_view.model()
@@ -334,12 +360,10 @@ class FOXSITargetGUI(QWidget):
                     row_name = model.headerData(row, Qt.Vertical)
                     row_data = [row_name] + [model.index(row, col).data() for col in range(model.columnCount()-5)]
                     writer.writerow(row_data)    
+            QMessageBox.information(self, 'CSV Generated', 'CSV File Created!')
         else:
             QMessageBox.warning(self, "Error", "No Data!")
             return
-    
-    
-    
     ###########################################################################
     def closeEvent(self,event):
         QApplication.quit()      
@@ -507,6 +531,9 @@ class SPARCSGUI(QWidget):
     def sparcs_exportToCSV(self,launchdate):
         # Create filename
         filedir  = os.path.join(os.getcwd(), "SPARCS-Target_Tables")
+        # Check if the directory exists, if not create it
+        if not os.path.exists(filedir):
+            os.makedirs(filedir)
         filename = os.path.join(filedir, "SPARCS-Target_Tables_"+launchdate+".csv")
         # Access the table model
         model = self.table_view.model()
@@ -528,6 +555,7 @@ class SPARCSGUI(QWidget):
                 row_name = model.headerData(row, Qt.Vertical)
                 row_data = [row_name] + [model.index(row, col).data() for col in range(model.columnCount())]
                 writer.writerow(row_data)
+        QMessageBox.information(self, 'CSV Generated', 'CSV File Created!')
 ###############################################################################
 ###############################################################################
 # Main 
