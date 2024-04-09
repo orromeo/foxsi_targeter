@@ -28,6 +28,11 @@ import os
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+from matplotlib import colors as clrs
+# Set alphabet list
+azlist = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P']
+colors = ['red', 'green', 'blue', 'orange', 'purple','cyan','yellow','grey','brown','black','silver','white']
 ###############################################################################
 ###############################################################################
 # Class for Main GUI
@@ -68,9 +73,9 @@ class FOXSITargetGUI(QWidget):
         self.date_time_edit = QDateTimeEdit(ldate.replace(hour=19,minute=53,second=0,microsecond=0))
         self.date_time_edit.setDisplayFormat("yyyy/MM/ddTHH:mm:ss")  # Set display format
         hbox.addWidget(self.date_time_edit)
-        #----------------------------------------------------------------------
         # Add Hbox to Layout
         layout.addLayout(hbox)
+        #----------------------------------------------------------------------
         # Create layout for ar locations, and hmi image
         button_layout = QHBoxLayout()
         # Add Science AR Locations Button
@@ -83,18 +88,38 @@ class FOXSITargetGUI(QWidget):
         convert2_button.setStyleSheet("font-size: 38px; font-weight: bold;")
         convert2_button.clicked.connect(self.sparcs_target)
         button_layout.addWidget(convert2_button)
-        # Add HMI Button
-        picture_button = QPushButton("SAAS: HMI Image")
-        picture_button.setStyleSheet("font-size: 38px; font-weight: bold;")
-        picture_button.clicked.connect(self.show_hmi)
-        button_layout.addWidget(picture_button)
         # Add buttons to layout
         layout.addLayout(button_layout)
+        #----------------------------------------------------------------------
+        # Create layout for ar locations, and hmi image
+        im_layout = QHBoxLayout()
+        # Add AIA
+        aia_button = QPushButton("AIA MAP")
+        aia_button.setStyleSheet("font-size: 38px; font-weight: bold;")
+        aia_button.clicked.connect(lambda: self.show_map("aia"))
+        im_layout.addWidget(aia_button)
+        # Add HMI MAG
+        hmim_button = QPushButton("HMI MAG MAP")
+        hmim_button.setStyleSheet("font-size: 38px; font-weight: bold;")
+        hmim_button.clicked.connect(lambda: self.show_map("maghmi"))
+        im_layout.addWidget(hmim_button)
+        # Add HMI CONT
+        hmic_button = QPushButton("HMI CONT MAP")
+        hmic_button.setStyleSheet("font-size: 38px; font-weight: bold;")
+        hmic_button.clicked.connect(lambda: self.show_map("conthmi"))
+        im_layout.addWidget(hmic_button)
+        # Add HMI SAAS Button
+        picture_button = QPushButton("SAAS: HMI CONT MAP")
+        picture_button.setStyleSheet("font-size: 38px; font-weight: bold;")
+        picture_button.clicked.connect(lambda: self.show_map("saashmi"))
+        im_layout.addWidget(picture_button)
+        # Add buttons to layout
+        layout.addLayout(im_layout)
         #----------------------------------------------------------------------
         # Science Table Output
         space_label = QLabel(" ")
         space_label.setAlignment(Qt.AlignCenter)
-        space_label.setFixedHeight(100)
+        space_label.setFixedHeight(20)
         space_label.setStyleSheet("font-size: 48px; font-weight: bold;")
         layout.addWidget(space_label)
         table_label = QLabel("FOXSI SCIENCE: AR Targeting Table")
@@ -194,7 +219,7 @@ class FOXSITargetGUI(QWidget):
             if len(parts) < 2:
                 QMessageBox.warning(self, "Error", "Invalid data format.")
                 return
-            row_names.append(" "+str(ri+1)+". "+parts[0]+"         ")
+            row_names.append(" "+str(azlist[ri])+". "+parts[0].split('.')[-1]+"         ")
             values = parts[1].replace(' (', ' ').replace(')', '').replace(',', ' ').split()
             fvals  = []
             # Assign HPC Values
@@ -280,39 +305,227 @@ class FOXSITargetGUI(QWidget):
         self.new_window = SPARCSGUI(self)
         self.new_window.showMaximized()
     ###########################################################################
-    def show_hmi(self):
-        
+    def show_map(self,maptype):
+        #----------------------------------------------------------------------
+        # Get the input data
+        data = self.data_text.toPlainText().strip()
+        # Split the data into rows
+        rows = data.split('\n')
+        #----------------------------------------------------------------------
+        # Get AR data
+        rows_data = rows[2:]
+        # Get AR Observation Date
+        obsdate = (rows[0].split(' '))[-1]
+        # Get the selected launch date
+        launchdate = self.date_time_edit.dateTime().toString("yyyy/MM/ddTHH:mm:ss")
+        # Initialize Table contents
+        coor_data   = np.zeros((2,len(rows_data)))
+        row_names    = []
+        #----------------------------------------------------------------------
+        # Iterate each AR
+        for ri,row in enumerate(rows_data):
+            parts = row.split(': ')
+            if len(parts) >= 2:
+                row_names.append(" "+str(azlist[ri])+". "+parts[0].split('.')[-1]+"         ")
+                values = parts[1].replace(' (', ' ').replace(')', '').replace(',', ' ').split()
+                # Assign HPC Values
+                Tx = float(values[-2].replace('"', ''))
+                Ty = float(values[-1].replace('"', ''))
+                newTx,newTy,launchlon,launchlat = self.transform_target_to_foxsi_hpc(Tx,Ty,obsdate,launchdate)
+                coor_data[0,ri] = launchlon[2].value
+                coor_data[1,ri] = launchlat[2].value
+
         # Open a file explorer dialog to select a file
-        default_dir = os.path.join(os.getcwd(), "HMI")
+        default_dir = os.path.join(os.getcwd(), "Solar_Maps")
         img_dir = os.path.join(default_dir, "Images")
         data_dir = os.path.join(default_dir, "Data")
-                                   
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select Picture",data_dir, "Image Files (*.png *.jpg *.jpeg *.bmp *.fits)")
-        print(file_path)
-        
-        
-        
-        # Check if a file is selected
-        if file_path:
-            hmi_map = sunpy.map.Map(file_path)
-            hmi_rotated = hmi_map.rotate(-90*u.degree,order=3)
-            #hmi_rotated = hmi_map.rotate(order=3)
-            fig = plt.figure()
-            ax = fig.add_subplot(projection=hmi_rotated)
-            ax.set_title("HMI IMAGE IN SAAS FRAME")
-            hmi_rotated.plot(axes=ax)
-            plt.show()
-            plt.savefig(os.path.join(img_dir, "Test"),bbox_inches='tight',pad_inches=0.01)
-            plt.close()
-            subprocess.Popen(['C:/Users/Orlando/Downloads/foxsi_pointer/HMI/Images/Test.png'], shell=True)
-        else:
-            # Display the selected picture (placeholder code)
-            QMessageBox.warning(self, "Error", "No Image!")
+        # Check if the directory exists, if not create it
+        if not os.path.exists(img_dir):
+            os.makedirs(img_dir)
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir)
+        #----------------------------------------------------------------------
+        if maptype =='saashmi':
+            data_dir = os.path.join(data_dir, "HMI","CONT")
+            if not os.path.exists(data_dir):
+                os.makedirs(data_dir)
+            file_path, _ = QFileDialog.getOpenFileName(self, "Select SAAS HMI Data",data_dir, "Image Files (*.png *.jpg *.jpeg *.bmp *.fits)")
+            # Check if a file is selected
+            if file_path:
+                hmi_map = sunpy.map.Map(file_path)
+                hmi_rotated = hmi_map.rotate(angle=-90*u.degree,order=3)
+                # aia_rotated = hmi_map.rotate(angle=-90*u.degree,order=3)
+                # fig = plt.figure()
+                # ax = fig.add_subplot(projection=aia_rotated)
+                # aia_rotated.plot(axes=ax, clip_interval=(1, 99.99)*u.percent)
+                # aia_rotated.draw_limb(axes=ax)
+                # aia_rotated.draw_grid(axes=ax)
+                # plt.show()
+                #hmi_rotated.plot(axes=ax)
+                # Plot Data
+                data = ((hmi_rotated.data))
+                data[np.where(np.isnan(data))] = 0
+                datasz = np.shape(data)
+                fig = plt.figure(figsize=(20,20))
+                # Set the background color of the plot
+                ax = fig.add_subplot(projection=hmi_rotated)
+                ax.set_facecolor('black')
+                ax.imshow(data, cmap='gray',extent=[0,datasz[0],0,datasz[1]])
+                # Set Targets on Image
+                coor = np.zeros((2,len(rows_data)))
+                if row_names is not None:
+                    # Get scale
+                    scl = hmi_rotated.scale[0].value
+                    # Transform to SAAS Frame
+                    coor[0,:] = -1*coor_data[1,:]/scl + datasz[1]/2
+                    coor[1,:] =  coor_data[0,:]/scl + datasz[0]/2
+                
+                # Create a custom ticker formatter
+                if 0:
+                    scl = hmi_rotated.scale[0].value
+                    label_format = '{:,.0f}'
+                    ticks_loc = ax.get_xticks().tolist()
+                    ax.xaxis.set_major_locator(mticker.FixedLocator(ticks_loc))
+                    ax.set_xticklabels([label_format.format(x) for x in ((ax.get_xticks()-datasz[0]/2)*scl)])
+                    ticks_loc = ax.get_yticks().tolist()
+                    ax.yaxis.set_major_locator(mticker.FixedLocator(ticks_loc))
+                    ax.set_yticklabels([label_format.format(x) for x in ((ax.get_yticks()-datasz[0]/2)*scl)])
+                ax.set_title("HMI Continuum"+hmi_map.date.strftime('%Y-%m-%dT%H:%M:%S')+" - SAAS Frame ", fontsize=38)
+                # Add annotation at the bottom
+                arrow_text = "Solar North"
+                ax.annotate(arrow_text, xy=(0.35, -.03), xytext=(0.45, -.04), fontsize=32,
+                xycoords='axes fraction', textcoords='axes fraction',
+                arrowprops=dict(facecolor='black', arrowstyle='->', linewidth=4))
+                ax.set_xlim([-datasz[0]/3,datasz[0]+datasz[0]/3])
+                ax.set_ylim([-datasz[1]/3,datasz[0]+datasz[1]/3])
+                if row_names != []:
+                    # Plot each circle with a different color
+                    for i in range(len(row_names)):
+                        plt.scatter(coor[0,i], coor[1,i], marker='o', 
+                                    facecolors='none', label=row_names[i],linewidths=5, s=600, color=colors[i])
+                    # Add legend
+                    plt.legend(fontsize=24)
+                plt.show()
+                # Save and Open File
+                sfile = os.path.join(img_dir, "HMI_IMAGE_"+hmi_map.date.strftime('%Y-%m-%dT%H%M%S'))
+                plt.savefig(sfile)
+                plt.close()
+                subprocess.Popen(sfile+".png", shell=True)
+            else:
+                # Display the selected picture (placeholder code)
+                QMessageBox.warning(self, "Error", "No Image!")
+        #----------------------------------------------------------------------
+        if maptype =='aia':
+            data_dir = os.path.join(data_dir, "AIA")
+            if not os.path.exists(data_dir):
+                os.makedirs(data_dir)
+            file_path, _ = QFileDialog.getOpenFileName(self, "Select AIA Data",data_dir, "Image Files (*.png *.jpg *.jpeg *.bmp *.fits)")
+            # Check if a file is selected
+            if file_path:
+                plt.rcParams.update({'font.size':32})
+                aiamap = sunpy.map.Map(file_path)
+                fig = plt.figure(figsize=(20,20))
+                ax1 = fig.add_subplot( projection=aiamap)
+                aiamap.plot(axes=ax1, title="AIA MAP "+aiamap.date.strftime('%Y-%m-%dT%H:%M:%S')+" (Solar North)",
+                            clip_interval=(60, 99.8)*u.percent)
+                if row_names != []:
+                    # Plot each circle with a different color
+                    for i in range(len(row_names)):
+                                
+                        ax1.plot_coord(SkyCoord(coor_data[0,i] * u.arcsec, coor_data[1,i] * u.arcsec, frame=aiamap.coordinate_frame), "o",
+                                      label=row_names[i],markersize=30,color=colors[i],markerfacecolor='none',markeredgewidth=8)
+                                    
+                    # Add legend
+                    ax1.legend(fontsize=24)
+                plt.show()
+                # Save and Open File
+                sfile = os.path.join(img_dir, "AIA_IMAGE_"+aiamap.date.strftime('%Y-%m-%dT%H%M%S'))
+                plt.savefig(sfile)
+                plt.close()
+                subprocess.Popen(sfile+".png", shell=True)    
+            else:
+                # Display the selected picture (placeholder code)
+                QMessageBox.warning(self, "Error", "No Image!")
+        #----------------------------------------------------------------------
+        if maptype =='maghmi':
+            data_dir = os.path.join(data_dir, "HMI","MAG")
+            if not os.path.exists(data_dir):
+                os.makedirs(data_dir)
+            file_path, _ = QFileDialog.getOpenFileName(self, "Select HMI MAG Data",data_dir, "Image Files (*.png *.jpg *.jpeg *.bmp *.fits)")
+            # Check if a file is selected
+            if file_path:
+                plt.rcParams.update({'font.size':32})
+                map_hmi = sunpy.map.Map(file_path)
+                map_hmi = map_hmi.rotate(order=3)
+                map_hmi.plot_settings['cmap'] = "hmimag"
+                map_hmi.plot_settings['norm'] = plt.Normalize(-1500, 1500)
+                fig = plt.figure(figsize=(20,20))
+                ax1 = fig.add_subplot( projection=map_hmi)
+                map_hmi.plot(axes=ax1, title="HMI MAGNETOGRAM MAP "+map_hmi.date.strftime('%Y-%m-%dT%H:%M:%S')+" (Solar North)")
+                            #clip_interval=(10, 99.99)*u.percent)
+                if row_names != []:
+                    # Plot each circle with a different color
+                    for i in range(len(row_names)):
+                                
+                        ax1.plot_coord(SkyCoord(coor_data[0,i] * u.arcsec, coor_data[1,i] * u.arcsec, frame=map_hmi.coordinate_frame), "o",
+                                      label=row_names[i],markersize=30,color=colors[i],markerfacecolor='none',markeredgewidth=8)
+                                    
+                    # Add legend
+                    ax1.legend(fontsize=24)
+                plt.show()
+                # Save and Open File
+                sfile = os.path.join(img_dir, "HMI_MAGNETIC_IMAGE_"+map_hmi.date.strftime('%Y-%m-%dT%H%M%S'))
+                plt.savefig(sfile)
+                plt.close()
+                subprocess.Popen(sfile+".png", shell=True) 
+            else:
+                # Display the selected picture (placeholder code)
+                QMessageBox.warning(self, "Error", "No Image!")
+        #----------------------------------------------------------------------
+        if maptype =='conthmi':
+            data_dir = os.path.join(data_dir, "HMI","CONT")
+            if not os.path.exists(data_dir):
+                os.makedirs(data_dir)
+            file_path, _ = QFileDialog.getOpenFileName(self, "Select HMI CONT Data",data_dir, "Image Files (*.png *.jpg *.jpeg *.bmp *.fits)")
+            # Check if a file is selected
+            if file_path:
+                plt.rcParams.update({'font.size':32})
+                map_hmi = sunpy.map.Map(file_path)
+                map_hmi = map_hmi.rotate(order=3)
+
+                #map_hmi.plot_settings['cmap'] = "hmimag"
+                #map_hmi.plot_settings['norm'] = plt.Normalize(-1500, 1500)
+                fig = plt.figure(figsize=(20,20))
+                ax1 = fig.add_subplot( projection=map_hmi)
+                map_hmi.plot(axes=ax1, title="HMI Continuum MAP "+map_hmi.date.strftime('%Y-%m-%dT%H:%M:%S')+" (Solar North)")
+                            #clip_interval=(10, 99.99)*u.percent)
+                
+                if row_names != []:
+                    # Plot each circle with a different color
+                    for i in range(len(row_names)):
+                                
+                        ax1.plot_coord(SkyCoord(coor_data[0,i] * u.arcsec, coor_data[1,i] * u.arcsec, frame=map_hmi.coordinate_frame), "o",
+                                      label=row_names[i],markersize=30,color=colors[i],markerfacecolor='none',markeredgewidth=8)
+                                    
+                    # Add legend
+                    ax1.legend(fontsize=24)
+                plt.show()
+                # Save and Open File
+                sfile = os.path.join(img_dir, "HMI_CONT_IMAGE_"+map_hmi.date.strftime('%Y-%m-%dT%H%M%S'))
+                plt.savefig(sfile)
+                plt.close()
+                subprocess.Popen(sfile+".png", shell=True)
+            else:
+                # Display the selected picture (placeholder code)
+                QMessageBox.warning(self, "Error", "No Image!")
     ###########################################################################
     def science_exportToCSV(self,launchdate):
         # Create filename
         filedir  = os.path.join(os.getcwd(), "Science-Target_Tables")
-        filename = os.path.join(filedir, "Science-Target_Tables_"+launchdate+".csv")
+        # Check if the directory exists, if not create it
+        if not os.path.exists(filedir):
+            os.makedirs(filedir)
+        filename = os.path.join(filedir, "FOXSI-Science-Target_Tables_"+launchdate+".csv")
         # Access the table model
         model = self.table_view.model()
         if model is not None:
@@ -334,12 +547,10 @@ class FOXSITargetGUI(QWidget):
                     row_name = model.headerData(row, Qt.Vertical)
                     row_data = [row_name] + [model.index(row, col).data() for col in range(model.columnCount()-5)]
                     writer.writerow(row_data)    
+            QMessageBox.information(self, 'CSV Generated', 'CSV File Created!')
         else:
             QMessageBox.warning(self, "Error", "No Data!")
             return
-    
-    
-    
     ###########################################################################
     def closeEvent(self,event):
         QApplication.quit()      
@@ -409,7 +620,7 @@ class SPARCSGUI(QWidget):
             if len(parts) < 2:
                 QMessageBox.warning(self, "Error", "Invalid data format.")
                 return
-            row_names.append(" "+str(ri+1)+". "+parts[0]+"         ")
+            row_names.append(" "+str(azlist[ri])+". "+parts[0].split('.')[-1]+"         ")
             values = parts[1].replace(' (', ' ').replace(')', '').replace(',', ' ').split()
             fvals  = []
             # Assign HPC Values
@@ -507,7 +718,10 @@ class SPARCSGUI(QWidget):
     def sparcs_exportToCSV(self,launchdate):
         # Create filename
         filedir  = os.path.join(os.getcwd(), "SPARCS-Target_Tables")
-        filename = os.path.join(filedir, "SPARCS-Target_Tables_"+launchdate+".csv")
+        # Check if the directory exists, if not create it
+        if not os.path.exists(filedir):
+            os.makedirs(filedir)
+        filename = os.path.join(filedir, "FOXSI-SPARCS-Target_Tables_"+launchdate+".csv")
         # Access the table model
         model = self.table_view.model()
         # Open the CSV file for writing
@@ -528,11 +742,19 @@ class SPARCSGUI(QWidget):
                 row_name = model.headerData(row, Qt.Vertical)
                 row_data = [row_name] + [model.index(row, col).data() for col in range(model.columnCount())]
                 writer.writerow(row_data)
+        QMessageBox.information(self, 'CSV Generated', 'CSV File Created!')
+###############################################################################
+def create_application():
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication(sys.argv)
+    return app
+###############################################################################
 ###############################################################################
 ###############################################################################
 # Main 
 if __name__ == '__main__':
-    app       = QApplication(sys.argv)
+    app = create_application()
     converter = FOXSITargetGUI()
     # Maximize the window
     converter.showMaximized()  
