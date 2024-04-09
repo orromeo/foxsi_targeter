@@ -79,7 +79,7 @@ def predict_target_position(planning_target, times, **kwargs):
 
     # Differentially rotate target to launch time.
     target_diffrot = SkyCoord(RotatedSunFrame(base=planning_target.frame, rotated_time=foxsi_skycoord.obstime,
-                                              rotation_model=kwargs.pop("rotation_model", "allen"), **kwargs))
+                                              rotation_model=kwargs.pop("rotation_model", None), **kwargs))
     # Transform to FOXSI observer view.
     target_prediction = target_diffrot.transform_to(Helioprojective(observer=foxsi_skycoord))
 
