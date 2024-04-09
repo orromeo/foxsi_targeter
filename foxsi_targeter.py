@@ -32,7 +32,7 @@ import matplotlib.ticker as mticker
 from matplotlib import colors as clrs
 # Set alphabet list
 azlist = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P']
-colors = ['red', 'green', 'blue', 'orange', 'purple','cyan','white','grey','black']
+colors = ['red', 'green', 'blue', 'orange', 'purple','cyan','yellow','grey','brown','black','silver','white']
 ###############################################################################
 ###############################################################################
 # Class for Main GUI
@@ -346,6 +346,9 @@ class FOXSITargetGUI(QWidget):
             os.makedirs(data_dir)
         #----------------------------------------------------------------------
         if maptype =='saashmi':
+            data_dir = os.path.join(data_dir, "HMI","CONT")
+            if not os.path.exists(data_dir):
+                os.makedirs(data_dir)
             file_path, _ = QFileDialog.getOpenFileName(self, "Select SAAS HMI Data",data_dir, "Image Files (*.png *.jpg *.jpeg *.bmp *.fits)")
             # Check if a file is selected
             if file_path:
@@ -387,7 +390,7 @@ class FOXSITargetGUI(QWidget):
                     ticks_loc = ax.get_yticks().tolist()
                     ax.yaxis.set_major_locator(mticker.FixedLocator(ticks_loc))
                     ax.set_yticklabels([label_format.format(x) for x in ((ax.get_yticks()-datasz[0]/2)*scl)])
-                ax.set_title("HMI "+hmi_map.date.strftime('%Y-%m-%dT%H:%M:%S')+" - SAAS Frame ", fontsize=38)
+                ax.set_title("HMI Continuum"+hmi_map.date.strftime('%Y-%m-%dT%H:%M:%S')+" - SAAS Frame ", fontsize=38)
                 # Add annotation at the bottom
                 arrow_text = "Solar North"
                 ax.annotate(arrow_text, xy=(0.35, -.03), xytext=(0.45, -.04), fontsize=32,
@@ -413,6 +416,9 @@ class FOXSITargetGUI(QWidget):
                 QMessageBox.warning(self, "Error", "No Image!")
         #----------------------------------------------------------------------
         if maptype =='aia':
+            data_dir = os.path.join(data_dir, "AIA")
+            if not os.path.exists(data_dir):
+                os.makedirs(data_dir)
             file_path, _ = QFileDialog.getOpenFileName(self, "Select AIA Data",data_dir, "Image Files (*.png *.jpg *.jpeg *.bmp *.fits)")
             # Check if a file is selected
             if file_path:
@@ -421,8 +427,7 @@ class FOXSITargetGUI(QWidget):
                 fig = plt.figure(figsize=(20,20))
                 ax1 = fig.add_subplot( projection=aiamap)
                 aiamap.plot(axes=ax1, title="AIA MAP "+aiamap.date.strftime('%Y-%m-%dT%H:%M:%S')+" (Solar North)",
-                            clip_interval=(10, 99.99)*u.percent)
-                
+                            clip_interval=(60, 99.8)*u.percent)
                 if row_names != []:
                     # Plot each circle with a different color
                     for i in range(len(row_names)):
@@ -443,21 +448,21 @@ class FOXSITargetGUI(QWidget):
                 QMessageBox.warning(self, "Error", "No Image!")
         #----------------------------------------------------------------------
         if maptype =='maghmi':
+            data_dir = os.path.join(data_dir, "HMI","MAG")
+            if not os.path.exists(data_dir):
+                os.makedirs(data_dir)
             file_path, _ = QFileDialog.getOpenFileName(self, "Select HMI MAG Data",data_dir, "Image Files (*.png *.jpg *.jpeg *.bmp *.fits)")
             # Check if a file is selected
             if file_path:
                 plt.rcParams.update({'font.size':32})
                 map_hmi = sunpy.map.Map(file_path)
                 map_hmi = map_hmi.rotate(order=3)
-
                 map_hmi.plot_settings['cmap'] = "hmimag"
                 map_hmi.plot_settings['norm'] = plt.Normalize(-1500, 1500)
                 fig = plt.figure(figsize=(20,20))
-                print(type(map_hmi))
                 ax1 = fig.add_subplot( projection=map_hmi)
                 map_hmi.plot(axes=ax1, title="HMI MAGNETOGRAM MAP "+map_hmi.date.strftime('%Y-%m-%dT%H:%M:%S')+" (Solar North)")
                             #clip_interval=(10, 99.99)*u.percent)
-                
                 if row_names != []:
                     # Plot each circle with a different color
                     for i in range(len(row_names)):
@@ -478,6 +483,9 @@ class FOXSITargetGUI(QWidget):
                 QMessageBox.warning(self, "Error", "No Image!")
         #----------------------------------------------------------------------
         if maptype =='conthmi':
+            data_dir = os.path.join(data_dir, "HMI","CONT")
+            if not os.path.exists(data_dir):
+                os.makedirs(data_dir)
             file_path, _ = QFileDialog.getOpenFileName(self, "Select HMI CONT Data",data_dir, "Image Files (*.png *.jpg *.jpeg *.bmp *.fits)")
             # Check if a file is selected
             if file_path:
@@ -488,9 +496,8 @@ class FOXSITargetGUI(QWidget):
                 #map_hmi.plot_settings['cmap'] = "hmimag"
                 #map_hmi.plot_settings['norm'] = plt.Normalize(-1500, 1500)
                 fig = plt.figure(figsize=(20,20))
-                print(type(map_hmi))
                 ax1 = fig.add_subplot( projection=map_hmi)
-                map_hmi.plot(axes=ax1, title="HMI Cont. MAP "+map_hmi.date.strftime('%Y-%m-%dT%H:%M:%S')+" (Solar North)")
+                map_hmi.plot(axes=ax1, title="HMI Continuum MAP "+map_hmi.date.strftime('%Y-%m-%dT%H:%M:%S')+" (Solar North)")
                             #clip_interval=(10, 99.99)*u.percent)
                 
                 if row_names != []:
