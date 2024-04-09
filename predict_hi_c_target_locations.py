@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 import astropy.units as u
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import get_body, SkyCoord
 from astropy.time import Time
-from sunpy.coordinates import HeliographicStonyhurst
+from sunpy.coordinates import Helioprojective
 
 import hi_c_targeter
 
@@ -21,16 +21,16 @@ H. AR 13631: N11W49 (711",247")
 
 # Define target coordinates.
 obstime = Time("2024-04-08 19:30", scale="utc")
-frame = HeliographicStonyhurst
-coord_units = [u.deg, u.deg]
-planning_targets = {"A": SkyCoord(lat=20, lon=-84, unit=coord_units, obstime=obstime, frame=frame),
-                    "B": SkyCoord(lat=26, lon=-5, unit=coord_units, obstime=obstime, frame=frame),
-                    "C": SkyCoord(lat=5, lon=67, unit=coord_units, obstime=obstime, frame=frame),
-                    "D": SkyCoord(lat=-8, lon=-47, unit=coord_units, obstime=obstime, frame=frame),
-                    "E": SkyCoord(lat=8, lon=-2, unit=coord_units, obstime=obstime, frame=frame),
-                    "F": SkyCoord(lat=-11, lon=65, unit=coord_units, obstime=obstime, frame=frame),
-                    "G": SkyCoord(lat=26, lon=-57, unit=coord_units, obstime=obstime, frame=frame),
-                    "H": SkyCoord(lat=11, lon=49, unit=coord_units, obstime=obstime, frame=frame)}
+frame = Helioprojective(observer=get_body("Earth", obstime))
+coord_units = [u.arcsec, u.arcsec]
+planning_targets = {"A": SkyCoord(Tx=-895, Ty=335, unit=coord_units, frame=frame),
+                    "B": SkyCoord(Tx=-75, Ty=509, unit=coord_units, frame=frame),
+                    "C": SkyCoord(Tx=879, Ty=122, unit=coord_units, frame=frame),
+                    "D": SkyCoord(Tx=-695, Ty=-64, unit=coord_units, frame=frame),
+                    "E": SkyCoord(Tx=-33, Ty=233, unit=coord_units, frame=frame),
+                    "F": SkyCoord(Tx=853, Ty=-140, unit=coord_units, frame=frame),
+                    "G": SkyCoord(Tx=-720, Ty=470, unit=coord_units, frame=frame),
+                    "H": SkyCoord(Tx=711, Ty=247, unit=coord_units, frame=frame)}
 planning_targets = list(planning_targets.values())
 
 # Define payload orientations
@@ -45,4 +45,4 @@ x_shifts, predicted_positions = hi_c_targeter.calculate_sparcs_x_offsets_for_tar
 
 print(x_shifts)
 
-x_shifts.write("hi_c_sparcs_targets.csv")
+#x_shifts.write("hi_c_sparcs_targets.csv")
