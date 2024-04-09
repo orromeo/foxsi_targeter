@@ -396,7 +396,7 @@ class FOXSITargetGUI(QWidget):
         # Check if the directory exists, if not create it
         if not os.path.exists(filedir):
             os.makedirs(filedir)
-        filename = os.path.join(filedir, "Science-Target_Tables_"+launchdate+".csv")
+        filename = os.path.join(filedir, "FOXSI-Science-Target_Tables_"+launchdate+".csv")
         # Access the table model
         model = self.table_view.model()
         if model is not None:
@@ -592,7 +592,7 @@ class SPARCSGUI(QWidget):
         # Check if the directory exists, if not create it
         if not os.path.exists(filedir):
             os.makedirs(filedir)
-        filename = os.path.join(filedir, "SPARCS-Target_Tables_"+launchdate+".csv")
+        filename = os.path.join(filedir, "FOXSI-SPARCS-Target_Tables_"+launchdate+".csv")
         # Access the table model
         model = self.table_view.model()
         # Open the CSV file for writing
