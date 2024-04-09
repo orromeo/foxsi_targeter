@@ -373,16 +373,13 @@ class FOXSITargetGUI(QWidget):
             arrowprops=dict(facecolor='black', arrowstyle='->', linewidth=4))
             ax.set_xlim([-datasz[0]/3,datasz[0]+datasz[0]/3])
             ax.set_ylim([-datasz[1]/3,datasz[0]+datasz[1]/3])
-
-            # Plot each circle with a different color
-            for i in range(len(row_names)):
-                #ax.scatter(2048,2048, marker='o', color='purple',
-                #            facecolors='none', label='Test',linewidths=5, s=600, edgecolors=colors[i])
-                plt.scatter(coor[0,i], coor[1,i], marker='o', 
-                            facecolors='none', label=row_names[i],linewidths=5, s=600, color=colors[i])
-            # Add legend
-            plt.legend(fontsize=24)
-            
+            if row_names != []:
+                # Plot each circle with a different color
+                for i in range(len(row_names)):
+                    plt.scatter(coor[0,i], coor[1,i], marker='o', 
+                                facecolors='none', label=row_names[i],linewidths=5, s=600, color=colors[i])
+                # Add legend
+                plt.legend(fontsize=24)
             plt.show()
             # Save and Open File
             sfile = os.path.join(img_dir, "HMI_IMAGE_"+hmi_map.date.strftime('%Y-%m-%dT%H%M%S'))
@@ -618,10 +615,17 @@ class SPARCSGUI(QWidget):
                 writer.writerow(row_data)
         QMessageBox.information(self, 'CSV Generated', 'CSV File Created!')
 ###############################################################################
+def create_application():
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication(sys.argv)
+    return app
+###############################################################################
+###############################################################################
 ###############################################################################
 # Main 
 if __name__ == '__main__':
-    app       = QApplication(sys.argv)
+    app = create_application()
     converter = FOXSITargetGUI()
     # Maximize the window
     converter.showMaximized()  
