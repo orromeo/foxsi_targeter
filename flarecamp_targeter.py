@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 AUTHOR:  Orlando Romeo, Dan Ryan
-UPDATE:  04/06/2024
+UPDATE:  04/09/2024
 PURPOSE:
-    Find targeting of possible AR locations for FOXSI-4 Campaign
+    Find targeting of possible AR locations for FOXSI-4 and Hi-C Campaign
 """
-##############################################################################
+###############################################################################
 ###############################################################################
 # --------------------------------- PyQT Modules
 from datetime import datetime
@@ -29,10 +29,25 @@ import csv
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
-from matplotlib import colors as clrs
+###############################################################################
+###############################################################################
+
+# Campaign Inputs
+###############################################################################
 # Set alphabet list
 azlist = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P']
-colors = ['red', 'green', 'blue', 'orange', 'purple','cyan','yellow','grey','brown','black','silver','white']
+colors = ['red', 'yellow', 'blue', 'green', 'purple','cyan','green','grey','brown','black','silver','white']
+# set default launch window time
+lwtime     = [19,53,0,0] #Hour, Minute, Second, Milisecond
+lwdur      = 4 # Duration of launch window
+lcl_time   = -8 # UTC to Local Time
+# Create dictionary
+foxsi_dict = {'mission':'FOXSI','sparcsoffset':[149.21,-156.15],'dtime':1,'dlon':10,'dlat':90}
+hic_dict = {'mission':'Hi-C','sparcsoffset':[np.nan,np.nan],'dtime':9,'dlon':5,'dlat':90}
+# Set rocket coordinates
+rocket_lon, rocket_lat, rocket_altitude = -147.47*u.deg, 65.12*u.deg, 197*u.m
+rocket_apogee = 400*u.km
+###############################################################################
 ###############################################################################
 ###############################################################################
 # Class for Main GUI
@@ -40,7 +55,7 @@ class FOXSITargetGUI(QWidget):
     ###########################################################################
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("FOXSI Targeting") # Main GUI
+        self.setWindowTitle("Flare Campaign Targeting") # Main GUI
         self.new_window = None                      # Initial SPARCS GUI
         self.initUI()
     ###########################################################################
@@ -51,7 +66,7 @@ class FOXSITargetGUI(QWidget):
         hbox = QHBoxLayout()
         #----------------------------------------------------------------------
         # Set title
-        title_label = QLabel('FOXSI Active Region Targeting')
+        title_label = QLabel('Flare Campaign: Active Region Targeting')
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet("font-size: 56px; font-weight: bold;")
         layout.addWidget(title_label)
@@ -70,7 +85,7 @@ class FOXSITargetGUI(QWidget):
         date_label.setStyleSheet("font-weight: bold;")
         hbox.addWidget(date_label)        
         ldate = datetime.now()
-        self.date_time_edit = QDateTimeEdit(ldate.replace(hour=19,minute=53,second=0,microsecond=0))
+        self.date_time_edit = QDateTimeEdit(ldate.replace(hour=lwtime[0],minute=lwtime[1],second=lwtime[2],microsecond=lwtime[3]))
         self.date_time_edit.setDisplayFormat("yyyy/MM/ddTHH:mm:ss")  # Set display format
         hbox.addWidget(self.date_time_edit)
         # Add Hbox to Layout
@@ -79,15 +94,25 @@ class FOXSITargetGUI(QWidget):
         # Create layout for ar locations, and hmi image
         button_layout = QHBoxLayout()
         # Add Science AR Locations Button
-        convert_button = QPushButton("SCIENCE: Targeting")
+        convert_button = QPushButton("FOXSI SCIENCE Target Table")
         convert_button.setStyleSheet("font-size: 38px; font-weight: bold;")
-        convert_button.clicked.connect(self.science_target)
+        convert_button.clicked.connect(lambda: self.science_target(foxsi_dict))
         button_layout.addWidget(convert_button)
         # Add Science AR Locations Button
-        convert2_button = QPushButton("SPARCS: Targeting")
+        convert2_button = QPushButton("FOXSI SPARCS Target Table")
         convert2_button.setStyleSheet("font-size: 38px; font-weight: bold;")
-        convert2_button.clicked.connect(self.sparcs_target)
+        convert2_button.clicked.connect(lambda: self.sparcs_target(foxsi_dict))
         button_layout.addWidget(convert2_button)
+        # Add Science AR Locations Button
+        converth_button = QPushButton("Hi-C SCIENCE Target Table")
+        converth_button.setStyleSheet("font-size: 38px; font-weight: bold;")
+        converth_button.clicked.connect(lambda: self.science_target(hic_dict))
+        button_layout.addWidget(converth_button)
+        # Add Science AR Locations Button
+        convert3_button = QPushButton("Hi-C SPARCS Target Table")
+        convert3_button.setStyleSheet("font-size: 38px; font-weight: bold;")
+        convert3_button.clicked.connect(lambda: self.sparcs_target(hic_dict))
+        button_layout.addWidget(convert3_button)
         # Add buttons to layout
         layout.addLayout(button_layout)
         #----------------------------------------------------------------------
@@ -122,7 +147,7 @@ class FOXSITargetGUI(QWidget):
         space_label.setFixedHeight(20)
         space_label.setStyleSheet("font-size: 48px; font-weight: bold;")
         layout.addWidget(space_label)
-        table_label = QLabel("FOXSI SCIENCE: AR Targeting Table")
+        table_label = QLabel("SCIENCE AR Target Table")
         table_label.setAlignment(Qt.AlignCenter)
         table_label.setStyleSheet("font-size: 48px; font-weight: bold;")
         layout.addWidget(table_label)
@@ -148,19 +173,31 @@ class FOXSITargetGUI(QWidget):
         return Tx_onlimb,Ty_onlimb
     ###########################################################################
     # Transform AR Location to FOXSI Observer during Launch Window
-    def transform_target_to_foxsi_hpc(self,Tx,Ty, obstime,launch_starttime, **kwargs):
+    def transform_target_to_rocket(self,Tx,Ty, obstime,launch_starttime,dtime,**kwargs):
         # Get launch window times        
-        foxsi_times = sunpy.time.parse_time(launch_starttime) + np.arange(0, 5, 1) * u.hour
+        foxsi_times = sunpy.time.parse_time(launch_starttime,scale='utc') + \
+                      np.linspace(np.floor((lwdur/2)/dtime),lwdur,num=dtime) * u.hour
         # Get observed time of AR
         obs_time   = sunpy.time.parse_time(obstime,scale='utc')
         #----------------------------------------------------------------------
         # Get coordinate of FOXSI at apogee.
-        poker_lon, poker_lat, poker_altitude = -147.47*u.deg, 65.12*u.deg, 197*u.m
-        apogee = 400*u.km
-        foxsi_loc = astropy.coordinates.EarthLocation(lon=poker_lon, lat=poker_lat, height=poker_altitude + apogee)
+        foxsi_loc = astropy.coordinates.EarthLocation(lon=rocket_lon, lat=rocket_lat, height=rocket_altitude + rocket_apogee)
         foxsi_skycoord = SkyCoord(foxsi_loc.get_gcrs(foxsi_times))
         # Find observer of AR
         target_observer = astropy.coordinates.get_body("Earth", time=obs_time)
+        #----------------------------------------------------------------------
+        # Method of using Stonyhurst Coordinates
+        # coord_units = [u.deg,u.deg]
+        # frame = HeliographicStonyhurst
+        # planning_targets = {"A": SkyCoord(lat=20, lon=-84, unit=coord_units, obstime=obstime, frame=frame),
+        #             "B": SkyCoord(lat=26, lon=-5, unit=coord_units, obstime=obstime, frame=frame),
+        #             "C": SkyCoord(lat=5, lon=67, unit=coord_units, obstime=obstime, frame=frame),
+        #             "D": SkyCoord(lat=-8, lon=-47, unit=coord_units, obstime=obstime, frame=frame),
+        #             "E": SkyCoord(lat=8, lon=-2, unit=coord_units, obstime=obstime, frame=frame),
+        #             "F": SkyCoord(lat=-11, lon=65, unit=coord_units, obstime=obstime, frame=frame),
+        #             "G": SkyCoord(lat=26, lon=-57, unit=coord_units, obstime=obstime, frame=frame),
+        #             "H": SkyCoord(lat=11, lon=49, unit=coord_units, obstime=obstime, frame=frame)}
+        # planning_targets = list(planning_targets.values())
         #----------------------------------------------------------------------
         # Iterate until AR is on disk in case it is off disk
         new_Tx = np.nan
@@ -169,10 +206,11 @@ class FOXSITargetGUI(QWidget):
             # Create Helioprojective coordinates
             planning_target = SkyCoord(Tx * u.arcsec, Ty * u.arcsec,
                               frame=Helioprojective(observer=target_observer))
+            #planning_target = planning_targets[cntr]
             # Differentially rotate target to launch time.
             target_diffrot = SkyCoord(\
                              RotatedSunFrame(base=planning_target.frame,\
-                                             rotated_time=foxsi_times,\
+                                             rotated_time=foxsi_skycoord.obstime,\
                                              rotation_model=kwargs.get("rotation_model", "howard")))
             # Transform to FOXSI observer view.
             flight_target = target_diffrot.transform_to(Helioprojective(observer=foxsi_skycoord))
@@ -184,8 +222,12 @@ class FOXSITargetGUI(QWidget):
         #----------------------------------------------------------------------
         return Tx,Ty,flight_target.Tx,flight_target.Ty
     ###########################################################################
-    def science_target(self):
+    def science_target(self,mission_dict):
         #----------------------------------------------------------------------
+        self.mission      = mission_dict['mission']
+        sparcsoffset = mission_dict['sparcsoffset']
+        dtime = 5
+        dtimes = np.linspace(np.floor((lwdur/2)/dtime),lwdur,num=dtime)
         # Get the input data
         data = self.data_text.toPlainText().strip()
         # Check if data is empty
@@ -225,28 +267,29 @@ class FOXSITargetGUI(QWidget):
             # Assign HPC Values
             Tx = float(values[-2].replace('"', ''))
             Ty = float(values[-1].replace('"', ''))
-            newTx,newTy,launchlon,launchlat = self.transform_target_to_foxsi_hpc(Tx,Ty,obsdate,launchdate)
+            newTx,newTy,launchlon,launchlat = self.transform_target_to_rocket(Tx,Ty,obsdate,launchdate,dtime)
             # Check if on solar disk
             if newTx == Tx:
                 fvals.append('Yes')
             else:
                 fvals.append('No')
-            fvals.append("({:+.2f}, {:+.2f})".format(newTx, newTy))
+            # Plot in North and West coordinates
+            fvals.append("({:+.2f}, {:+.2f})".format(newTy, newTx))
             #------------------------------------------------------------------
             launchcoor = ["({:+.2f}, {:+.2f})".format(x, y) \
-                          for x, y, in zip(launchlon.to_value(u.arcsec),launchlat.to_value(u.arcsec))]
+                          for x, y, in zip(launchlat.to_value(u.arcsec),launchlon.to_value(u.arcsec))]
             fvals.extend(launchcoor)
             # Assign Column Values in Row
-            offsetlaunchcoor = ["({:+.2f}, {:+.2f})".format(x+149.21, y-156.15) \
-                          for x,y in zip(launchlon.to_value(u.arcsec),launchlat.to_value(u.arcsec))]
+            offsetlaunchcoor = ["({:+.2f}, {:+.2f})".format(x+np.nan_to_num(sparcsoffset[1], nan=0), y+np.nan_to_num(sparcsoffset[0], nan=0)) \
+                          for x,y in zip(launchlat.to_value(u.arcsec),launchlon.to_value(u.arcsec))]
             # Add Column Values
             fvals.extend(offsetlaunchcoor)
             table_data.append(fvals)
         #----------------------------------------------------------------------
         # Assign Column Names
-        column_names = ["On Disk?",' \nSDO\n(θx,θy) ["]\nLWT{:+.1f}hr\n   '.format(rot_duration)]
-        launchnames  =  [f' \nOPTICS\n(θx,θy) ["]\nLWT+{i}hr\n   ' for i in range(0, len(launchlon))]
-        offsetnames  =  [f' \nSPARCS\n(θx,θy) ["]\nLWT+{i}hr\n   ' for i in range(0, len(launchlon))]
+        column_names = ["On Disk?",' \nSDO\n(N, W) ["]\nLWT{:+.1f}hr\n   '.format(rot_duration)]
+        launchnames  =  [f' \n{self.mission}\nEXP\n(N, W) ["]\nLWT+{i}hr\n   ' for i in dtimes]
+        offsetnames  =  [f' \n{self.mission}\nSPARCS\n(N, W) ["]\nLWT+{i}hr\n   ' for i in dtimes]
         column_names.extend(launchnames)
         column_names.extend(offsetnames)
         # Check for Errors
@@ -286,7 +329,7 @@ class FOXSITargetGUI(QWidget):
         self.table_view.setModel(model)
         
     ###########################################################################
-    def sparcs_target(self):
+    def sparcs_target(self,mission):
         #----------------------------------------------------------------------
         # Get the input data
         data = self.data_text.toPlainText().strip()
@@ -302,7 +345,7 @@ class FOXSITargetGUI(QWidget):
             return
         #----------------------------------------------------------------------
         # Create new GUI
-        self.new_window = SPARCSGUI(self)
+        self.new_window = SPARCSGUI(self,mission)
         self.new_window.showMaximized()
     ###########################################################################
     def show_map(self,maptype):
@@ -331,7 +374,7 @@ class FOXSITargetGUI(QWidget):
                 # Assign HPC Values
                 Tx = float(values[-2].replace('"', ''))
                 Ty = float(values[-1].replace('"', ''))
-                newTx,newTy,launchlon,launchlat = self.transform_target_to_foxsi_hpc(Tx,Ty,obsdate,launchdate)
+                newTx,newTy,launchlon,launchlat = self.transform_target_to_rocket(Tx,Ty,obsdate,launchdate)
                 coor_data[0,ri] = launchlon[2].value
                 coor_data[1,ri] = launchlat[2].value
 
@@ -525,7 +568,7 @@ class FOXSITargetGUI(QWidget):
         # Check if the directory exists, if not create it
         if not os.path.exists(filedir):
             os.makedirs(filedir)
-        filename = os.path.join(filedir, "FOXSI-Science-Target_Tables_"+launchdate+".csv")
+        filename = os.path.join(filedir, self.mission+"-Science-Target_Tables_"+launchdate+".csv")
         # Access the table model
         model = self.table_view.model()
         if model is not None:
@@ -535,6 +578,7 @@ class FOXSITargetGUI(QWidget):
                 # Write column headers
                 headers = ['Target']
                 headers.extend([model.headerData(col, Qt.Horizontal).replace("OPTICS","FOXSI "
+                                                                    ).replace("EXP"," EXP"
                                                                     ).replace("\n",""
                                                                     ).replace("Δ"," del"
                                                                     ).replace("θ"," T"
@@ -558,41 +602,32 @@ class FOXSITargetGUI(QWidget):
 ###############################################################################            
 class SPARCSGUI(QWidget):
     ###########################################################################
-    def __init__(self, parent):
+    def __init__(self, parent,mission_dict):
         super().__init__()
-        self.setWindowTitle("SPARCS Targeting")
-        self.initUI(parent)
+        self.setWindowTitle(mission_dict['mission'] +" SPARCS Targeting")
+        self.initUI(parent,mission_dict)
     ###########################################################################
-    def initUI(self,parent):
+    def initUI(self,parent,mission_dict):
+        self.mission      = mission_dict['mission']
+        sparcsoffset = mission_dict['sparcsoffset']
+        dtime        = mission_dict['dtime']
+        dtimes = np.linspace(np.floor((lwdur/2)/dtime),lwdur,num=dtime)
+        midt = int(len(dtimes)/2)
+        dlon = mission_dict['dlon']
+        dlat = mission_dict['dlat']
         # Create Layout
         layout = QVBoxLayout()
         # Horizontal layout for text edit and date input
         hbox = QHBoxLayout()
-        title_label = QLabel("SPARCS Targeting")
+        title_label = QLabel(self.mission +" SPARCS Targeting")
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet("font-size: 48px; font-weight: bold;")
         layout.addLayout(hbox)
         # Add title label
-        title_label = QLabel("SPARCS Targeting")
+        title_label = QLabel(self.mission +" SPARCS Targeting")
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet("font-size: 48px; font-weight: bold;")
         layout.addWidget(title_label)
-        # Create layout for "Aligned" label and combo box
-        aligned_layout = QHBoxLayout()
-        # Add label for "Aligned" text
-        aligned_label = QLabel("Solar-North Alignment:")
-        aligned_label.setAlignment(Qt.AlignCenter)
-        aligned_label.setFixedHeight(200)
-        aligned_label.setStyleSheet("font-size: 38px; font-weight: bold;")
-        aligned_layout.addWidget(aligned_label)
-        # Create combo box for drop-down selection
-        self.comboBox = QComboBox()
-        self.comboBox.addItems(["Payload +0", "Payload +180"])
-        self.comboBox.setStyleSheet("font-size: 38px; font-weight: bold;")
-        aligned_layout.addWidget(self.comboBox)
-        self.comboBox.currentIndexChanged.connect(self.multiplyRowValues)
-        # Add aligned layout to main layout
-        layout.addLayout(aligned_layout)
         #----------------------------------------------------------------------
         # Initialize Table
         self.table_view = QTableView()
@@ -626,56 +661,58 @@ class SPARCSGUI(QWidget):
             # Assign HPC Values
             Tx = float(values[-2].replace('"', ''))
             Ty = float(values[-1].replace('"', ''))
-            newTx,newTy,launchlon,launchlat = parent.transform_target_to_foxsi_hpc(Tx,Ty,obsdate,launchdate)
+            newTx,newTy,launchlon,launchlat = parent.transform_target_to_rocket(Tx,Ty,obsdate,launchdate,dtime)
             #------------------------------------------------------------------
-            # Check payload alignment
-            index = self.comboBox.currentIndex()
-            if self.comboBox.itemText(index) == "Payload +0":
-                multiplier = 1
-            else:
-                multiplier= -1
+            # Set center values
+            fvals.extend(["(  {:+.2f}, {:+.2f}  )".format(launchlat.to_value(u.arcsec)[midt],launchlon.to_value(u.arcsec)[midt])])
+            fvals.extend(["(  {:+.2f}, {:+.2f}  )".format(sparcsoffset[1],sparcsoffset[0])])
             # Compute new delta values
-            lonround = np.round(launchlon.to_value(u.arcsec)+149.21)
-            latround = np.round(launchlat.to_value(u.arcsec)-156.15)
-            delx = 10
-            dely = 90
-            lonsprc = [multiplier*np.round((x - lonround[2]) / delx) * delx for x in lonround]
-            latsprc = [multiplier*np.round((x - latround[2]) / dely) * dely for x in latround]
-            lonsprc[2] = lonround[2]
-            latsprc[2] = latround[2]
+            lonround = np.round(launchlon.to_value(u.arcsec)+np.nan_to_num(sparcsoffset[0], nan=0))
+            latround = np.round(launchlat.to_value(u.arcsec)+np.nan_to_num(sparcsoffset[1], nan=0))
+            lonsprc = [np.round((x - lonround[midt]) / dlon) * dlon for x in lonround]
+            latsprc = [np.round((x - latround[midt]) / dlat) * dlat for x in latround]
+            lonsprc[midt] = lonround[midt]
+            latsprc[midt] = latround[midt]
             # Assign Column Values in Row
             offsetlaunchcoor = ["{:+}".format(x) for x in lonsprc]
-            offsetlaunchcoor[2] = "(  {:+.2f}, {:+.2f}  )".format(lonround[2],latround[2])
+            offsetlaunchcoor[midt] = "(  {:+.2f}, {:+.2f}  )".format(latround[midt],lonround[midt])
             # Add Column Values
             fvals.extend(offsetlaunchcoor)
+            fvals.extend(['East'])
             table_data.append(fvals)
         #----------------------------------------------------------------------
         # Assign Column Names
-        column_names = [f' \nSPARCS\nΔθx ["]\nLWT+{i}hr\n   ' for i in range(0,int( (len(launchlon)-1)/2))]
-        column_names.extend([' \nSPARCS\n( θx, θy ) ["]\nLWT+2hr\n   '])
-        column_names.extend([f' \nSPARCS\nΔθx ["]\nLWT+{i}hr\n   ' for i in range(3,len(launchlon))])
+        column_names = [f' \n{self.mission}\nEXP\n(N, W) ["]\nLWT+2hr\n   ']
+        column_names.extend([f' \n{self.mission}\nEXP-SPARCS Offset\n(ΔN, ΔW) ["]\n   '])
+        
+        column_names.extend([f' \n{self.mission}\nSPARCS\nΔW ["]\nLWT+{i}hr\n   ' for i in dtimes[0:(midt)]])
+        column_names.extend([f' \n{self.mission}\nSPARCS\n( N, W ) ["]\nLWT+2hr\n   '])
+        column_names.extend([f' \n{self.mission}\nSPARCS\nΔW ["]\nLWT+{i}hr\n   ' for i in dtimes[(midt+1):]])
+        column_names.extend(['Payload\nOrientation'])
+        # Save payload orientation
+        self.payload_ornt = ['east']*len(row_names)
         # Check for Errors
         if not row_names or not column_names or not table_data:
             QMessageBox.warning(self, "Error", "Data could not be processed.")
             return
         #----------------------------------------------------------------------
         # Set up table
-        model = QStandardItemModel(len(row_names), len(column_names))
-        model.setHorizontalHeaderLabels(column_names)
-        model.setVerticalHeaderLabels(row_names)
+        self.model = QStandardItemModel(len(row_names), len(column_names))
+        self.model.setHorizontalHeaderLabels(column_names)
+        self.model.setVerticalHeaderLabels(row_names)
         for row_idx, row in enumerate(table_data):
             # Extract every other value as it corresponds to the data we need
             for col_idx, value in enumerate(row):
                 item = QStandardItem(value)
                 item.setTextAlignment(Qt.AlignCenter)
-                model.setItem(row_idx, col_idx, item)
+                self.model.setItem(row_idx, col_idx, item)
         # Set font style for row names and column names
         font = QFont()
         font.setBold(True)
         for row_idx in range(len(row_names)):
-            model.setHeaderData(row_idx, Qt.Vertical, font, role=Qt.FontRole)
+            self.model.setHeaderData(row_idx, Qt.Vertical, font, role=Qt.FontRole)
         for col_idx in range(len(column_names)):
-            model.setHeaderData(col_idx, Qt.Horizontal, font, role=Qt.FontRole)
+            self.model.setHeaderData(col_idx, Qt.Horizontal, font, role=Qt.FontRole)
         #----------------------------------------------------------------------
         # Set gridstyle
         self.table_view.setStyleSheet(
@@ -688,54 +725,92 @@ class SPARCSGUI(QWidget):
         # Show Grid
         self.table_view.setShowGrid(True)
         # Display the model in the table view
-        self.table_view.setModel(model)   
+        self.table_view.setModel(self.model)   
+        self.model.dataChanged.connect(self.handleClicked)
+        #self.setCentralWidget(self.table_view)
         #----------------------------------------------------------------------
         # Export to CSV
         convert_button = QPushButton("Export to CSV")
         convert_button.setStyleSheet("font-size: 38px; font-weight: bold;")
-        convert_button.clicked.connect(lambda: self.sparcs_exportToCSV(parent.date_time_edit.dateTime().toString("yyyy_MM_dd")))
+        convert_button.clicked.connect(lambda: self.sparcs_exportToCSV(parent.date_time_edit.dateTime(),dtimes))
         layout.addWidget(convert_button)
     ###########################################################################
-    def multiplyRowValues(self, index):
-        # Access the table model
+    def handleClicked(self, index):
         model = self.table_view.model()
-        # Iterate through each cell in the table
-        for row in range(model.rowCount()):
-            for col in range(model.columnCount()):
-                # Get the current cell value
-                cell_value = model.index(row, col).data()
-                # Convert the cell value to a float (assuming the value is convertible to a number)
-                try:
-                    cell_value = float(cell_value)
-                except ValueError:
-                    continue  # Skip non-numeric values
-                # Multiply the cell value by -1 based on the selected index
-                #if index == 0:  # If "Payload +180" is selected
-                cell_value *= -1
-                # Set the updated value back to the cell
-                model.setData(model.index(row, col), str(cell_value))
+        colnum = model.columnCount()
+        if index.column() == (colnum-1):  # Check if clicked item is in the first column
+            edited_row = index.row()
+            # Get new value
+            edited_value = (model.item(edited_row,model.columnCount()-1).text()) 
+            if edited_value.lower() == 'east':
+                # Change values
+                delcol = colnum-4
+                for dc in range(delcol):
+                    # Update corresponding cell in the second column
+                    mult = -1
+                    if dc >= delcol/2:
+                        dc = dc+1
+                        mult = 1
+                    new_value = mult*abs(float((model.item(edited_row,dc+2).text())))
+                    new_item = QStandardItem("{:+}".format(new_value))
+                    new_item.setTextAlignment(Qt.AlignCenter)
+                    model.setItem(edited_row, dc+2, new_item)
+            if edited_value.lower() == 'west':
+                # Change values
+                delcol = colnum-4
+                for dc in range(delcol):
+                    # Update corresponding cell in the second column
+                    mult = 1
+                    if dc >= delcol/2:
+                        dc = dc+1
+                        mult = -1
+                    new_value = mult*abs(float((model.item(edited_row,dc+2).text())))
+                    new_item = QStandardItem("{:+}".format(new_value))
+                    new_item.setTextAlignment(Qt.AlignCenter)
+                    model.setItem(edited_row, dc+2, new_item)
+
     ###########################################################################
-    def sparcs_exportToCSV(self,launchdate):
+    def sparcs_exportToCSV(self,launchdate,dtimes):
+        launchtime = launchdate.toString("yyyy/MM/ddTHH:mm:ss")
+        launchday  = launchdate.toString("yyyy_MM_dd")
         # Create filename
         filedir  = os.path.join(os.getcwd(), "SPARCS-Target_Tables")
         # Check if the directory exists, if not create it
         if not os.path.exists(filedir):
             os.makedirs(filedir)
-        filename = os.path.join(filedir, "FOXSI-SPARCS-Target_Tables_"+launchdate+".csv")
+        filename = os.path.join(filedir, self.mission+"-SPARCS-Target_Tables_"+launchday+".csv")
         # Access the table model
         model = self.table_view.model()
         # Open the CSV file for writing
-        with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+        with open(filename, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
-            # Write column headers
-            headers = ['Target']
-            headers.extend([model.headerData(col, Qt.Horizontal).replace("SPARCS",""
-                                                               ).replace("\n",""
-                                                               ).replace("Δ"," del"
-                                                               ).replace("θ"," T"
-                                                               ).replace("θ"," T"
+            # Add Header
+            headers = [launchdate.toString("yyyy-MM-dd")]
+            headers.extend([model.headerData(col, Qt.Horizontal).replace("\n"," "
+                                                               ).replace("Δ"," d"
                                                                ).replace("hr","hr)"
                                                                ).replace("LWT"," (LWT") for col in range(model.columnCount())])
+            writer.writerow(headers)
+            
+            
+            # Add UTC Time
+            time_utcdata = ["Start Time [UTC]"," "," "]
+            time_utc     = sunpy.time.parse_time(launchtime,scale='utc') + dtimes * u.hour
+            time_utc_arr = [f"{t.hour:02d}:{t.minute:02d}" for t in time_utc.to_datetime()]
+            time_utcdata.extend(time_utc_arr)
+            time_utcdata.extend([" "])
+            writer.writerow(time_utcdata)
+            # Add Local Time
+            time_lcldata = ["Start Time [AKDT]"," "," "]
+            time_lcl     = sunpy.time.parse_time(launchtime,scale='utc') + (dtimes+lcl_time) * u.hour
+            time_lcl_arr = [f"{t.hour:02d}:{t.minute:02d}" for t in time_lcl.to_datetime()]
+            time_lcldata.extend(time_lcl_arr)
+            time_lcldata.extend([""])
+            writer.writerow(time_lcldata)
+            #Spacer
+            writer.writerow([" "])
+            # Write column headers
+            headers = ['Target']
             writer.writerow(headers)
             # Write data rows
             for row in range(model.rowCount()):
