@@ -4,3 +4,8 @@
 - Run the flarecamp_targeter routine to access the main GUI
 
 <img src="https://github.com/orromeo/foxsi_targeter/blob/master/HMI_Image.png?raw=true" width="500">
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> 0fb199b6b1b04fa061525c197b103a8216369349
