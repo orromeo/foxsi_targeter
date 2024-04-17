@@ -10,7 +10,7 @@ PURPOSE:
 # --------------------------------- PyQT Modules
 from datetime import datetime
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QTextEdit, \
-                            QPushButton, QTableView, QHBoxLayout,QComboBox, \
+                            QPushButton, QTableView, QHBoxLayout, \
                             QMessageBox,QDateTimeEdit, QFileDialog,QHeaderView
 from PyQt5.QtGui import QStandardItemModel, QStandardItem,QFont
 from PyQt5.QtCore import Qt
@@ -31,12 +31,11 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 ###############################################################################
 ###############################################################################
-
 # Campaign Inputs
 ###############################################################################
 # Set alphabet list
 azlist = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P']
-colors = ['red', 'yellow', 'blue', 'green', 'purple','cyan','green','grey','brown','black','silver','white']
+colors = ['red', 'yellow', 'blue', 'green', 'purple','cyan','orange','grey','brown','black','silver','white']
 # set default launch window time
 lwtime     = [19,53,0,0] #Hour, Minute, Second, Milisecond
 lwdur      = 4 # Duration of launch window
@@ -47,6 +46,8 @@ hic_dict = {'mission':'Hi-C','sparcsoffset':[np.nan,np.nan],'dtime':9,'dlon':5,'
 # Set rocket coordinates
 rocket_lon, rocket_lat, rocket_altitude = -147.47*u.deg, 65.12*u.deg, 197*u.m
 rocket_apogee = 400*u.km
+# Target number to exclue being rotated
+tarnum = 0
 ###############################################################################
 ###############################################################################
 ###############################################################################
@@ -267,7 +268,10 @@ class FOXSITargetGUI(QWidget):
             # Assign HPC Values
             Tx = float(values[-2].replace('"', ''))
             Ty = float(values[-1].replace('"', ''))
-            newTx,newTy,launchlon,launchlat = self.transform_target_to_rocket(Tx,Ty,obsdate,launchdate,dtime)
+            if ri != tarnum:
+                newTx,newTy,launchlon,launchlat = self.transform_target_to_rocket(Tx,Ty,obsdate,launchdate,dtime)
+            else:
+                newTx,newTy,launchlon,launchlat = self.transform_target_to_rocket(Tx,Ty,obsdate,obsdate,dtime)
             # Check if on solar disk
             if newTx == Tx:
                 fvals.append('Yes')
@@ -374,7 +378,10 @@ class FOXSITargetGUI(QWidget):
                 # Assign HPC Values
                 Tx = float(values[-2].replace('"', ''))
                 Ty = float(values[-1].replace('"', ''))
-                newTx,newTy,launchlon,launchlat = self.transform_target_to_rocket(Tx,Ty,obsdate,launchdate)
+                if ri != tarnum:
+                    newTx,newTy,launchlon,launchlat = self.transform_target_to_rocket(Tx,Ty,obsdate,launchdate,4)
+                else:
+                    newTx,newTy,launchlon,launchlat = self.transform_target_to_rocket(Tx,Ty,obsdate,obsdate,4)
                 coor_data[0,ri] = launchlon[2].value
                 coor_data[1,ri] = launchlat[2].value
 
@@ -446,6 +453,8 @@ class FOXSITargetGUI(QWidget):
                     for i in range(len(row_names)):
                         plt.scatter(coor[0,i], coor[1,i], marker='o', 
                                     facecolors='none', label=row_names[i],linewidths=5, s=600, color=colors[i])
+                        t = plt.text(coor[0,i]+100, coor[1,i]+100,
+                                       azlist[i],color=colors[i],fontsize=42)
                     # Add legend
                     plt.legend(fontsize=24)
                 plt.show()
@@ -477,7 +486,10 @@ class FOXSITargetGUI(QWidget):
                                 
                         ax1.plot_coord(SkyCoord(coor_data[0,i] * u.arcsec, coor_data[1,i] * u.arcsec, frame=aiamap.coordinate_frame), "o",
                                       label=row_names[i],markersize=30,color=colors[i],markerfacecolor='none',markeredgewidth=8)
-                                    
+                        t = ax1.text_coord(SkyCoord(coor_data[0,i]* u.arcsec+(50 * u.arcsec),
+                                                coor_data[1,i]* u.arcsec+(50 * u.arcsec), frame=aiamap.coordinate_frame),
+                                       azlist[i],color=colors[i],fontsize=56)
+                        t.set_bbox(dict(facecolor='black', alpha=0.5, edgecolor='black'))
                     # Add legend
                     ax1.legend(fontsize=24)
                 plt.show()
@@ -512,7 +524,10 @@ class FOXSITargetGUI(QWidget):
                                 
                         ax1.plot_coord(SkyCoord(coor_data[0,i] * u.arcsec, coor_data[1,i] * u.arcsec, frame=map_hmi.coordinate_frame), "o",
                                       label=row_names[i],markersize=30,color=colors[i],markerfacecolor='none',markeredgewidth=8)
-                                    
+                        t = ax1.text_coord(SkyCoord(coor_data[0,i]* u.arcsec+(50 * u.arcsec),
+                                                coor_data[1,i]* u.arcsec+(50 * u.arcsec), frame=map_hmi.coordinate_frame),
+                                       azlist[i],color=colors[i],fontsize=56)
+                        t.set_bbox(dict(facecolor='grey', alpha=0.85, edgecolor='grey'))            
                     # Add legend
                     ax1.legend(fontsize=24)
                 plt.show()
@@ -549,7 +564,9 @@ class FOXSITargetGUI(QWidget):
                                 
                         ax1.plot_coord(SkyCoord(coor_data[0,i] * u.arcsec, coor_data[1,i] * u.arcsec, frame=map_hmi.coordinate_frame), "o",
                                       label=row_names[i],markersize=30,color=colors[i],markerfacecolor='none',markeredgewidth=8)
-                                    
+                        t = ax1.text_coord(SkyCoord(coor_data[0,i]* u.arcsec+(50 * u.arcsec),
+                                                coor_data[1,i]* u.arcsec+(50 * u.arcsec), frame=map_hmi.coordinate_frame),
+                                       azlist[i],color=colors[i],fontsize=56)           
                     # Add legend
                     ax1.legend(fontsize=24)
                 plt.show()
@@ -661,7 +678,10 @@ class SPARCSGUI(QWidget):
             # Assign HPC Values
             Tx = float(values[-2].replace('"', ''))
             Ty = float(values[-1].replace('"', ''))
-            newTx,newTy,launchlon,launchlat = parent.transform_target_to_rocket(Tx,Ty,obsdate,launchdate,dtime)
+            if ri != tarnum:
+                newTx,newTy,launchlon,launchlat = parent.transform_target_to_rocket(Tx,Ty,obsdate,launchdate,dtime)
+            else:
+                newTx,newTy,launchlon,launchlat = parent.transform_target_to_rocket(Tx,Ty,obsdate,obsdate,dtime)
             #------------------------------------------------------------------
             # Set center values
             fvals.extend(["(  {:+.2f}, {:+.2f}  )".format(launchlat.to_value(u.arcsec)[midt],launchlon.to_value(u.arcsec)[midt])])
@@ -834,3 +854,15 @@ if __name__ == '__main__':
     # Maximize the window
     converter.showMaximized()  
     sys.exit(app.exec_())
+    
+    
+# Targets Observed: 2024/04/15T23:30:00
+# ------------------------------------------------------
+# A. East limb: N17E81 (-900", 300")
+# B. AR 13639: N29E49 (-632",515")
+# C. AR 13641/35: N16W3 (43", 352")
+# D. AR 13643: S14E65 (-844", -189")
+# E. AR 13637/8: S15E42 (-625", -183")
+# F. AR 13634: N26W44 (598",477")
+# G. AR 13636: S21E19 (-291",-260")    
+    
